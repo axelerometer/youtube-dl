@@ -3,17 +3,30 @@ from __future__ import unicode_literals
 import re
 
 from .common import InfoExtractor
-from ..utils import ExtractorError
+from ..utils import ExtractorError, urljoin
 
 
 class ChaturbateIE(InfoExtractor):
-    _VALID_URL = r'https?://(?:[^/]+\.)?chaturbate\.com/(?P<id>[^/?#]+)'
+    _VALID_URL = r'https?://(?:[^/]+\.)?chaturbate\.com/(?:fullvideo/\?b=)?(?P<id>[^/?&#]+)'
     _TESTS = [{
         'url': 'https://www.chaturbate.com/siswet19/',
         'info_dict': {
             'id': 'siswet19',
             'ext': 'mp4',
             'title': 're:^siswet19 [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$',
+            'age_limit': 18,
+            'is_live': True,
+        },
+        'params': {
+            'skip_download': True,
+        },
+        'skip': 'Room is offline',
+    }, {
+        'url': 'https://chaturbate.com/fullvideo/?b=caylin',
+        'info_dict': {
+            'id': 'caylin',
+            'ext': 'mp4',
+            'title': 're:^caylin [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$',
             'age_limit': 18,
             'is_live': True,
         },
@@ -55,6 +68,15 @@ class ChaturbateIE(InfoExtractor):
                     error = self._ROOM_OFFLINE
             if error:
                 raise ExtractorError(error, expected=True)
+
+            # Try the canonical URL (/fullvideo/?b=X canonical points to /X/)
+            canon_url = self._search_regex(
+                r'<link[^>]+rel=(["\']?)canonical\1[^>]+href=(["\'])(?P<url>[^>"\']+)\2',
+                webpage, 'canonical URL', group='url')
+            canon_url = urljoin(url, canon_url)
+            if canon_url != url and re.match(self._VALID_URL, canon_url):
+                return self._real_extract(canon_url)
+
             raise ExtractorError('Unable to find stream URL')
 
         formats = []
